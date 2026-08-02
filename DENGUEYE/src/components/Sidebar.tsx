@@ -14,17 +14,22 @@ import {
   X,
   AlertTriangle,
   Sun,
-  Moon
+  Moon,
+  Phone
 } from 'lucide-react';
 import { UserRole } from '../types';
+import { getRoleLabel } from '../auth/roleAccess';
 
 interface SidebarProps {
   currentRole: UserRole;
-  setCurrentRole: (role: UserRole) => void;
+  userName: string;
+  userEmail: string;
+  userPhone: string;
   activeTab: 'map' | 'command' | 'dispatch' | 'analytics';
   setActiveTab: (tab: 'map' | 'command' | 'dispatch' | 'analytics') => void;
   onOpenReportModal: () => void;
   onOpenSmsModal: () => void;
+  onOpenLoginModal: () => void;
   criticalClusterCount: number;
   totalActiveCases: number;
   isExpanded: boolean;
@@ -35,11 +40,14 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({
   currentRole,
-  setCurrentRole,
+  userName,
+  userEmail,
+  userPhone,
   activeTab,
   setActiveTab,
   onOpenReportModal,
   onOpenSmsModal,
+  onOpenLoginModal,
   criticalClusterCount,
   totalActiveCases,
   isExpanded,
@@ -50,11 +58,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navItems = [
-    { id: 'map', label: 'GIS Cluster Map', icon: MapPin },
-    { id: 'command', label: 'Commissioner Command', icon: Building2 },
-    { id: 'dispatch', label: 'Vector Dispatch Ops', icon: Activity },
-    { id: 'analytics', label: 'Epidemiology Analytics', icon: FileSpreadsheet },
-  ];
+    { id: 'map', label: 'GIS Cluster Map', icon: MapPin, roles: ['COMMISSIONER', 'PUBLIC_HEALTH_SUPERVISOR'] as UserRole[] },
+    { id: 'command', label: 'Commissioner Command', icon: Building2, roles: ['COMMISSIONER'] as UserRole[] },
+    { id: 'dispatch', label: 'Vector Dispatch Ops', icon: Activity, roles: ['COMMISSIONER', 'PUBLIC_HEALTH_SUPERVISOR'] as UserRole[] },
+    { id: 'analytics', label: 'Case History & Evidence', icon: FileSpreadsheet, roles: ['COMMISSIONER', 'PUBLIC_HEALTH_SUPERVISOR', 'FIELD_HEALTH_WORKER'] as UserRole[] },
+  ].filter((item) => item.roles.includes(currentRole));
 
   return (
     <>
@@ -181,14 +189,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {isExpanded && <span>Report Case (KoBo)</span>}
           </button>
 
-          <button
-            onClick={() => { onOpenSmsModal(); setMobileMenuOpen(false); }}
-            className="sidebar-action-secondary"
-            title="SMS Gateway Logs"
-          >
-            <MessageSquare style={{ width: 18, height: 18, flexShrink: 0 }} />
-            {isExpanded && <span>SMS Gateway Logs</span>}
-          </button>
+          {currentRole === 'COMMISSIONER' && (
+            <button
+              onClick={() => { onOpenSmsModal(); setMobileMenuOpen(false); }}
+              className="sidebar-action-secondary"
+              title="SMS Gateway Logs"
+            >
+              <MessageSquare style={{ width: 18, height: 18, flexShrink: 0 }} />
+              {isExpanded && <span>SMS Gateway Logs</span>}
+            </button>
+          )}
         </div>
 
         {/* Footer with Dark/Light Theme Switcher */}
@@ -207,23 +217,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {isExpanded && <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Toggle</span>}
           </button>
 
-          {/* Role Selector */}
+          {/* Logged-in account details */}
           {isExpanded && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', color: 'var(--text-muted)', fontSize: '11px' }}>
                 <UserCheck style={{ width: 12, height: 12, color: 'var(--accent-blue)' }} />
-                <span>OPERATOR ROLE</span>
+                <span>LOGGED IN PROFILE</span>
               </div>
-              <select
-                value={currentRole}
-                onChange={(e) => setCurrentRole(e.target.value as UserRole)}
-                className="role-select"
-                style={{ width: '100%' }}
-              >
-                <option value="COMMISSIONER">GVMC Commissioner</option>
-                <option value="PUBLIC_HEALTH_SUPERVISOR">Public Health Supervisor</option>
-                <option value="FIELD_HEALTH_WORKER">Ward Health Worker</option>
-              </select>
+
+              <div style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '0.5rem', padding: '0.625rem' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-primary)' }}>{userName}</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.66rem', marginTop: '0.25rem' }}>{getRoleLabel(currentRole)}</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.66rem', marginTop: '0.35rem' }}>{userEmail}</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.66rem', marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  <Phone style={{ width: '11px', height: '11px' }} />
+                  <span>{userPhone}</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button type="button" onClick={onOpenLoginModal} className="sidebar-action-secondary" style={{ width: '100%', justifyContent: 'center' }}>
+                  <UserCheck style={{ width: '14px', height: '14px' }} />
+                  <span>Switch Login</span>
+                </button>
+              </div>
             </div>
           )}
 

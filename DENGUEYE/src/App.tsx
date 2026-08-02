@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import './index.css';
-import { UserRole, DiseaseCase, VectorDispatchTask, SMSAlertLog, GISCluster } from './types';
+import { UserRole, DiseaseCase, VectorDispatchTask, SMSAlertLog, GISCluster, PhotoEvidenceAsset } from './types';
 import { INITIAL_WARDS, INITIAL_CASES, INITIAL_DISPATCHES, INITIAL_SMS_LOGS } from './data/vizagWardsData';
 import { detect48HourClusters } from './utils/clusterEngine';
 import { Sidebar } from './components/Sidebar';
@@ -10,27 +10,91 @@ import { VectorControlDispatch } from './components/VectorControlDispatch';
 import { AnalyticsPanel } from './components/AnalyticsPanel';
 import { FieldReportingForm } from './components/FieldReportingForm';
 import { SmsGatewaySimulator } from './components/SmsGatewaySimulator';
+import { AuthLogin } from './components/AuthLogin';
+import { useAuth } from './auth/AuthContext';
+import { resetDemoUsers } from './auth/session';
 import { Zap, X } from 'lucide-react';
 
+const CASES_STORAGE_KEY = 'dengueye-demo-cases';
+const DISPATCHES_STORAGE_KEY = 'dengueye-demo-dispatches';
+const SMS_STORAGE_KEY = 'dengueye-demo-sms';
+const WARDS_STORAGE_KEY = 'dengueye-demo-wards';
+const PHOTO_ASSETS_KEY = 'dengueye-demo-photo-assets';
+
+const readStorageData = <T,>(key: string, fallback: T): T => {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? JSON.parse(raw) as T : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const writeStorageData = <T,>(key: string, value: T) => {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(key, JSON.stringify(value));
+};
+
 export function App() {
-  const [currentRole, setCurrentRole] = useState<UserRole>('COMMISSIONER');
+  const { user, role, login, logout } = useAuth();
+  const currentRole = role ?? 'FIELD_HEALTH_WORKER';
   const [activeTab, setActiveTab] = useState<'map' | 'command' | 'dispatch' | 'analytics'>('map');
   const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(true);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   
-  const [wards, setWards] = useState(INITIAL_WARDS);
-  const [cases, setCases] = useState<DiseaseCase[]>(INITIAL_CASES);
-  const [dispatches, setDispatches] = useState<VectorDispatchTask[]>(INITIAL_DISPATCHES);
-  const [smsLogs, setSmsLogs] = useState<SMSAlertLog[]>(INITIAL_SMS_LOGS);
+  const [wards, setWards] = useState(() => readStorageData(WARDS_STORAGE_KEY, INITIAL_WARDS));
+  const [cases, setCases] = useState<DiseaseCase[]>(() => readStorageData(CASES_STORAGE_KEY, INITIAL_CASES));
+  const [photoAssets, setPhotoAssets] = useState<PhotoEvidenceAsset[]>(() => readStorageData(PHOTO_ASSETS_KEY, []));
+  const [dispatches, setDispatches] = useState<VectorDispatchTask[]>(() => readStorageData(DISPATCHES_STORAGE_KEY, INITIAL_DISPATCHES));
+  const [smsLogs, setSmsLogs] = useState<SMSAlertLog[]>(() => readStorageData(SMS_STORAGE_KEY, INITIAL_SMS_LOGS));
 
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isSmsModalOpen, setIsSmsModalOpen] = useState(false);
   const [activeToast, setActiveToast] = useState<string | null>(null);
 
-  // Sync data-theme attribute on <html> / <body> tag
+  useEffect(() => {
+    resetDemoUsers();
+    window.localStorage.setItem(CASES_STORAGE_KEY, JSON.stringify(INITIAL_CASES));
+    window.localStorage.setItem(DISPATCHES_STORAGE_KEY, JSON.stringify(INITIAL_DISPATCHES));
+    window.localStorage.setItem(SMS_STORAGE_KEY, JSON.stringify(INITIAL_SMS_LOGS));
+    window.localStorage.setItem(WARDS_STORAGE_KEY, JSON.stringify(INITIAL_WARDS));
+  }, []);
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    writeStorageData(CASES_STORAGE_KEY, cases);
+  }, [cases]);
+
+  useEffect(() => {
+    writeStorageData(PHOTO_ASSETS_KEY, photoAssets);
+  }, [photoAssets]);
+
+  useEffect(() => {
+    writeStorageData(DISPATCHES_STORAGE_KEY, dispatches);
+  }, [dispatches]);
+
+  useEffect(() => {
+    writeStorageData(SMS_STORAGE_KEY, smsLogs);
+  }, [smsLogs]);
+
+  useEffect(() => {
+    writeStorageData(WARDS_STORAGE_KEY, wards);
+  }, [wards]);
+
+  useEffect(() => {
+    if (!user) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+
+    const allowedDefaultMap = currentRole === 'COMMISSIONER' ? 'map' : currentRole === 'PUBLIC_HEALTH_SUPERVISOR' ? 'dispatch' : 'map';
+    setActiveTab(allowedDefaultMap);
+  }, [user, currentRole]);
 
   const { clusters } = useMemo(() => {
     return detect48HourClusters(cases, wards, 48, 500);
@@ -39,7 +103,31 @@ export function App() {
   const criticalClusters = clusters.filter(c => c.riskLevel === 'CRITICAL');
 
   const handleAddCase = (newCase: DiseaseCase) => {
-    const updatedCases = [newCase, ...cases];
+    const photoAssetId = `PHOTO-${newCase.id}`;
+    const storedAt = new Date().toISOString();
+
+    const persistedCase: DiseaseCase = {
+      ...newCase,
+      photoAssetId,
+      photoStoredAt: storedAt,
+    };
+
+    if (newCase.photoProofBase64) {
+      const photoDataUrl = newCase.photoProofBase64;
+      const photoAsset: PhotoEvidenceAsset = {
+        id: photoAssetId,
+        caseId: persistedCase.id,
+        patientName: persistedCase.patientName,
+        wardName: persistedCase.wardName,
+        reporterName: persistedCase.reporterName,
+        capturedAt: storedAt,
+        dataUrl: photoDataUrl,
+      };
+
+      setPhotoAssets(prev => [photoAsset, ...prev]);
+    }
+
+    const updatedCases = [persistedCase, ...cases];
     setCases(updatedCases);
 
     setWards(prev => prev.map(w => {
@@ -126,11 +214,14 @@ export function App() {
       {/* Expandable Sidebar Component */}
       <Sidebar
         currentRole={currentRole}
-        setCurrentRole={setCurrentRole}
+        userName={user?.fullName ?? 'Guest User'}
+        userEmail={user?.email ?? 'Not signed in'}
+        userPhone={user?.phone ?? '—'}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onOpenReportModal={() => setIsReportModalOpen(true)}
         onOpenSmsModal={() => setIsSmsModalOpen(true)}
+        onOpenLoginModal={() => setIsAuthModalOpen(true)}
         criticalClusterCount={criticalClusters.length}
         totalActiveCases={cases.length}
         isExpanded={isSidebarExpanded}
@@ -169,7 +260,13 @@ export function App() {
 
         {/* Page Content */}
         <main className="app-main">
-          {activeTab === 'map' && (
+          {!user && (
+            <div style={{ color: 'var(--text-primary)', fontWeight: 700 }}>
+              Please sign in to access the DenguEye operations dashboard.
+            </div>
+          )}
+
+          {user && activeTab === 'map' && currentRole !== 'FIELD_HEALTH_WORKER' && (
             <GisMap
               wards={wards}
               cases={cases}
@@ -179,7 +276,7 @@ export function App() {
             />
           )}
 
-          {activeTab === 'command' && (
+          {user && activeTab === 'command' && currentRole === 'COMMISSIONER' && (
             <CommandCenter
               wards={wards}
               clusters={clusters}
@@ -190,7 +287,7 @@ export function App() {
             />
           )}
 
-          {activeTab === 'dispatch' && (
+          {user && activeTab === 'dispatch' && currentRole !== 'FIELD_HEALTH_WORKER' && (
             <VectorControlDispatch
               dispatches={dispatches}
               wards={wards}
@@ -200,11 +297,12 @@ export function App() {
             />
           )}
 
-          {activeTab === 'analytics' && (
+          {user && activeTab === 'analytics' && (
             <AnalyticsPanel
               cases={cases}
               wards={wards}
               clusters={clusters}
+              photoAssets={photoAssets}
             />
           )}
         </main>
@@ -217,6 +315,15 @@ export function App() {
       </div>
 
       {/* Modals */}
+      <AuthLogin
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onAuthenticated={(authenticatedUser) => {
+          login(authenticatedUser);
+          setIsAuthModalOpen(false);
+        }}
+      />
+
       <FieldReportingForm
         wards={wards}
         isOpen={isReportModalOpen}
@@ -230,6 +337,7 @@ export function App() {
         logs={smsLogs}
         onSendTestSms={handleSendTestSms}
       />
+
 
     </div>
   );

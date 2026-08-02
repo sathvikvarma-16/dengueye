@@ -19,6 +19,16 @@ export interface WardInfo {
   lastFoggingDate: string;
 }
 
+export interface PhotoEvidenceAsset {
+  id: string;
+  caseId: string;
+  patientName: string;
+  wardName: string;
+  reporterName: string;
+  capturedAt: string;
+  dataUrl: string;
+}
+
 export interface DiseaseCase {
   id: string;
   patientName: string;
@@ -40,6 +50,8 @@ export interface DiseaseCase {
   breedingSiteNotes?: string;
   status: 'Reported' | 'Verified' | 'Under Investigation' | 'Resolved';
   photoProofBase64?: string;
+  photoAssetId?: string;
+  photoStoredAt?: string;
 }
 
 export interface GISCluster {
