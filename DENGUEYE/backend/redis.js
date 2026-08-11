@@ -1,13 +1,18 @@
 import { createClient } from 'redis';
 import { config } from './config.js';
 
-export const redisClient = createClient({
-  url: `redis://${config.redis.host}:${config.redis.port}`,
-});
+// Reuse a single redis client across warm/serverless invocations
+if (!globalThis.__redisClient) {
+  globalThis.__redisClient = createClient({
+    url: `redis://${config.redis.host}:${config.redis.port}`,
+  });
 
-redisClient.on('error', (err) => {
-  console.error('Redis client error', err);
-});
+  globalThis.__redisClient.on('error', (err) => {
+    console.error('Redis client error', err);
+  });
+}
+
+export const redisClient = globalThis.__redisClient;
 
 export const connectRedis = async () => {
   try {

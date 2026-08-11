@@ -155,17 +155,22 @@ app.get('/api/cases', authMiddleware, async (req, res) => {
 
   recordMetric('cacheMisses');
 
-  const result = await query('SELECT * FROM cases ORDER BY reported_at DESC LIMIT $1 OFFSET $2', [limit, offset]);
-  const countResult = await query('SELECT COUNT(*)::int AS total FROM cases');
-  const payload = {
-    items: result.rows,
-    page,
-    limit,
-    total: countResult.rows[0]?.total ?? 0,
-  };
+  try {
+    const result = await query('SELECT * FROM cases ORDER BY reported_at DESC LIMIT $1 OFFSET $2', [limit, offset]);
+    const countResult = await query('SELECT COUNT(*)::int AS total FROM cases');
+    const payload = {
+      items: result.rows,
+      page,
+      limit,
+      total: countResult.rows[0]?.total ?? 0,
+    };
 
-  await cacheSet(cacheKey, payload);
-  return res.json(payload);
+    await cacheSet(cacheKey, payload);
+    return res.json(payload);
+  } catch (dbError) {
+    logger.warn('Database query failed for /api/cases', { error: dbError && dbError.message ? dbError.message : String(dbError) });
+    return res.status(503).json({ message: 'Database unavailable', items: [], page, limit, total: 0 });
+  }
 });
 
 app.post('/api/jobs', authMiddleware, async (req, res) => {
@@ -205,23 +210,11 @@ const startServer = (port) => {
     process.exit(1);
   });
 };
+// Export the express app for serverless hosting (Vercel) and provide
+// a local bootstrap function for running the backend in a persistent process.
+export { app };
 
-const bootstrap = async () => {
+export const bootstrapLocal = async () => {
   await connectRedis();
   startServer(config.port);
 };
-
-bootstrap().catch((error) => {
-  logger.error('Backend bootstrap failed', { error: error.message });
-  process.exit(1);
-});
-
-process.on('SIGTERM', () => {
-  logger.info('Received SIGTERM, shutting down gracefully');
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  logger.info('Received SIGINT, shutting down gracefully');
-  process.exit(0);
-});
