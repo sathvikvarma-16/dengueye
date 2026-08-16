@@ -179,7 +179,7 @@ Contributions are welcome.
 **Sathvik Varma**
 
 - GitHub: https://github.com/sathvikvarma-16
-- LinkedIn: *(Add your LinkedIn profile here)*
+- LinkedIn: https://www.linkedin.com/in/sathvikvarma16/
 
 ---
 
