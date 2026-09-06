@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { AuthenticatedUser } from '../auth/sampleUsers';
 import { loginWithCredentials, saveSession } from '../auth/session';
-import { X, LockKeyhole } from 'lucide-react';
+import { X, LockKeyhole, Eye, EyeOff, UserRound } from 'lucide-react';
+import { getRoleLabel } from '../auth/roleAccess';
+import { SAMPLE_USERS } from '../auth/sampleUsers';
+import { UserRole } from '../types';
 
 interface AuthLoginProps {
   isOpen: boolean;
@@ -17,6 +20,9 @@ export const AuthLogin: React.FC<AuthLoginProps> = ({
   const [identifier, setIdentifier] = useState('worker1@gvmc.gov.in');
   const [password, setPassword] = useState('Worker1@GVMC');
   const [error, setError] = useState('');
+  const [selectedRole, setSelectedRole] = useState<UserRole>('FIELD_HEALTH_WORKER');
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const roleOptions: UserRole[] = ['FIELD_HEALTH_WORKER', 'PUBLIC_HEALTH_SUPERVISOR', 'COMMISSIONER'];
 
   if (!isOpen) return null;
 
@@ -96,6 +102,27 @@ export const AuthLogin: React.FC<AuthLoginProps> = ({
         </div>
 
         <form onSubmit={handleLogin} className="modal-body">
+          <div className="role-selection" aria-label="Select your role">
+            {roleOptions.map((roleOption) => (
+              <button
+                key={roleOption}
+                type="button"
+                className={`role-option ${selectedRole === roleOption ? 'role-option-selected' : ''}`}
+                onClick={() => {
+                  setSelectedRole(roleOption);
+                  const demoUser = SAMPLE_USERS.find((candidate) => candidate.role === roleOption);
+                  if (demoUser) {
+                    setIdentifier(demoUser.email);
+                    setPassword(demoUser.password);
+                  }
+                }}
+                aria-pressed={selectedRole === roleOption}
+              >
+                <UserRound size={16} aria-hidden="true" />
+                <span>{getRoleLabel(roleOption)}</span>
+              </button>
+            ))}
+          </div>
           <div className="form-group">
             <label className="form-label">Email / Phone *</label>
             <input
@@ -110,14 +137,19 @@ export const AuthLogin: React.FC<AuthLoginProps> = ({
 
           <div className="form-group">
             <label className="form-label">Password *</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="form-input"
-              placeholder="Enter password"
-            />
+            <div className="password-input-wrap">
+              <input
+                type={isPasswordVisible ? 'text' : 'password'}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="form-input"
+                placeholder="Enter password"
+              />
+              <button type="button" className="password-toggle" onClick={() => setIsPasswordVisible((visible) => !visible)} aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}>
+                {isPasswordVisible ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
+            </div>
           </div>
 
           {error && (

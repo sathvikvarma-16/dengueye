@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { DiseaseCase, WardInfo, GISCluster, PhotoEvidenceAsset } from '../types';
-import { BarChart3, Clock, Download, Image as ImageIcon } from 'lucide-react';
+import { BarChart3, Clock, Download, Image as ImageIcon, Trash2 } from 'lucide-react';
 
 interface AnalyticsPanelProps {
   cases: DiseaseCase[];
   wards: WardInfo[];
   clusters: GISCluster[];
   photoAssets: PhotoEvidenceAsset[];
+  canDeletePhotos: boolean;
+  onDeletePhoto: (caseId: string) => void;
 }
 
 export const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({
@@ -14,7 +16,10 @@ export const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({
   wards,
   clusters,
   photoAssets,
+  canDeletePhotos,
+  onDeletePhoto,
 }) => {
+  const [pendingDeleteCaseId, setPendingDeleteCaseId] = useState<string | null>(null);
   const dengueCases = cases.filter(c => c.disease === 'Dengue');
   const malariaCases = cases.filter(c => c.disease === 'Malaria');
   const latestPhotoAsset = photoAssets[0];
@@ -133,6 +138,12 @@ export const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({
                 <div style={{ color: '#cbd5e1', fontSize: '0.68rem' }}>{latestPhotoAsset?.wardName}</div>
                 <div style={{ color: '#94a3b8', fontSize: '0.66rem' }}>{latestPhotoAsset?.reporterName}</div>
                 <div style={{ color: '#67e8f9', fontSize: '0.62rem' }}>{latestPhotoAsset?.capturedAt}</div>
+                {canDeletePhotos && latestPhotoAsset && (
+                  <button type="button" className="photo-delete-button" onClick={() => setPendingDeleteCaseId(latestPhotoAsset.caseId)}>
+                    <Trash2 size={14} aria-hidden="true" />
+                    <span>Delete photo</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -160,6 +171,12 @@ export const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({
                         <div style={{ color: '#67e8f9', fontSize: '0.62rem' }}>Status: {entry.status}</div>
                         <div style={{ color: '#f59e0b', fontSize: '0.62rem' }}>Case ID: {entry.id}</div>
                         <div style={{ color: '#94a3b8', fontSize: '0.62rem' }}>Reported: {entry.reportedAt}</div>
+                        {canDeletePhotos && asset && (
+                          <button type="button" className="photo-delete-button" onClick={() => setPendingDeleteCaseId(entry.id)}>
+                            <Trash2 size={14} aria-hidden="true" />
+                            <span>Delete photo</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -169,6 +186,23 @@ export const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({
           </div>
         )}
       </div>
+
+      {pendingDeleteCaseId && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="delete-photo-title">
+          <div className="modal-content photo-delete-dialog">
+            <div className="modal-header">
+              <h2 id="delete-photo-title">Delete photo evidence?</h2>
+            </div>
+            <div className="modal-body">
+              <p className="photo-delete-message">This removes the stored photo from the browser record. The case report will remain.</p>
+              <div className="photo-delete-dialog-actions">
+                <button type="button" className="btn-primary" style={{ backgroundColor: '#1e293b' }} onClick={() => setPendingDeleteCaseId(null)}>Cancel</button>
+                <button type="button" className="btn-alert" onClick={() => { onDeletePhoto(pendingDeleteCaseId); setPendingDeleteCaseId(null); }}>Delete photo</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

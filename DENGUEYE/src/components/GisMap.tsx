@@ -40,6 +40,7 @@ export const GisMap: React.FC<GisMapProps> = ({
   dispatches,
   onDispatchCluster
 }) => {
+  const [isLegendOpen, setIsLegendOpen] = useState(false);
   const [selectedDisease, setSelectedDisease] = useState<string>('ALL');
   const [selectedWard, setSelectedWard] = useState<string>('ALL');
   const [timeFilterHours, setTimeFilterHours] = useState<number>(48);
@@ -134,11 +135,14 @@ export const GisMap: React.FC<GisMapProps> = ({
 
       </div>
 
-      <div className="map-cluster-legend" aria-label="cluster legend">
-        <span className="map-legend-chip"><span className="map-legend-dot" style={{ background: '#ef4444' }}></span>Critical</span>
-        <span className="map-legend-chip"><span className="map-legend-dot" style={{ background: '#f97316' }}></span>High</span>
-        <span className="map-legend-chip"><span className="map-legend-dot" style={{ background: '#eab308' }}></span>Moderate</span>
-        <span className="map-legend-chip"><span className="map-legend-dot" style={{ background: '#10b981' }}></span>Low</span>
+      <div className={`map-cluster-legend ${isLegendOpen ? 'map-cluster-legend-open' : ''}`} aria-label="cluster legend">
+        <button type="button" className="map-legend-toggle" onClick={() => setIsLegendOpen((open) => !open)} aria-expanded={isLegendOpen}>Legend</button>
+        <div className="map-legend-items">
+          <span className="map-legend-chip"><span className="map-legend-dot" style={{ background: '#ef4444' }}></span>Critical: 3+ cases</span>
+          <span className="map-legend-chip"><span className="map-legend-dot" style={{ background: '#f97316' }}></span>High: 2 cases</span>
+          <span className="map-legend-chip"><span className="map-legend-dot" style={{ background: '#eab308' }}></span>Moderate: 1 case</span>
+          <span className="map-legend-chip"><span className="map-legend-dot" style={{ background: '#10b981' }}></span>Low: ward baseline</span>
+        </div>
       </div>
 
       <MapContainer

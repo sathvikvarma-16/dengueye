@@ -9,11 +9,11 @@ export const ROLE_ACCESS: Record<UserRole, { tabs: AppTab[]; actions: string[] }
   },
   PUBLIC_HEALTH_SUPERVISOR: {
     tabs: ['map', 'dispatch', 'analytics'],
-    actions: ['REPORT_CASE', 'VERIFY_CASES', 'DISPATCH_VECTOR_TEAMS', 'VIEW_ANALYTICS'],
+    actions: ['REPORT_CASE', 'VERIFY_CASES', 'DISPATCH_VECTOR_TEAMS', 'VIEW_ANALYTICS', 'DELETE_PHOTO'],
   },
   COMMISSIONER: {
     tabs: ['map', 'command', 'dispatch', 'analytics'],
-    actions: ['REPORT_CASE', 'VERIFY_CASES', 'DISPATCH_VECTOR_TEAMS', 'VIEW_ANALYTICS', 'VIEW_SMS_LOGS'],
+    actions: ['REPORT_CASE', 'VERIFY_CASES', 'DISPATCH_VECTOR_TEAMS', 'VIEW_ANALYTICS', 'VIEW_SMS_LOGS', 'DELETE_PHOTO'],
   },
 };
 

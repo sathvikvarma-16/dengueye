@@ -11,15 +11,18 @@ import { AnalyticsPanel } from './components/AnalyticsPanel';
 import { FieldReportingForm } from './components/FieldReportingForm';
 import { SmsGatewaySimulator } from './components/SmsGatewaySimulator';
 import { AuthLogin } from './components/AuthLogin';
+import { IntroScreen } from './components/IntroScreen';
 import { useAuth } from './auth/AuthContext';
+import { canPerformAction } from './auth/roleAccess';
 import { resetDemoUsers } from './auth/session';
-import { Zap, X } from 'lucide-react';
+import { MessageCircle, Zap, X } from 'lucide-react';
 
 const CASES_STORAGE_KEY = 'dengueye-demo-cases';
 const DISPATCHES_STORAGE_KEY = 'dengueye-demo-dispatches';
 const SMS_STORAGE_KEY = 'dengueye-demo-sms';
 const WARDS_STORAGE_KEY = 'dengueye-demo-wards';
 const PHOTO_ASSETS_KEY = 'dengueye-demo-photo-assets';
+const CONCERNED_OFFICER_WHATSAPP = '916302493468';
 
 const readStorageData = <T,>(key: string, fallback: T): T => {
   if (typeof window === 'undefined') return fallback;
@@ -43,6 +46,7 @@ export function App() {
   const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(true);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isIntroVisible, setIsIntroVisible] = useState(() => !user);
   
   const [wards, setWards] = useState(() => readStorageData(WARDS_STORAGE_KEY, INITIAL_WARDS));
   const [cases, setCases] = useState<DiseaseCase[]>(() => readStorageData(CASES_STORAGE_KEY, INITIAL_CASES));
@@ -53,6 +57,7 @@ export function App() {
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isSmsModalOpen, setIsSmsModalOpen] = useState(false);
   const [activeToast, setActiveToast] = useState<string | null>(null);
+  const [submittedCase, setSubmittedCase] = useState<DiseaseCase | null>(null);
 
   useEffect(() => {
     resetDemoUsers();
@@ -129,6 +134,7 @@ export function App() {
 
     const updatedCases = [persistedCase, ...cases];
     setCases(updatedCases);
+    setSubmittedCase(persistedCase);
 
     setWards(prev => prev.map(w => {
       if (w.id === newCase.wardId) {
@@ -144,6 +150,42 @@ export function App() {
 
     setActiveToast(`New case reported by ${newCase.reporterName} in ${newCase.wardName}. 48h GIS clusters re-evaluated!`);
   };
+
+  const handleSendToWhatsApp = () => {
+    if (!submittedCase) return;
+
+    const message = [
+      'DENGUEYE CASE REPORT',
+      `Case ID: ${submittedCase.id}`,
+      `Patient: ${submittedCase.patientName}`,
+      `Disease: ${submittedCase.disease} (${submittedCase.diagnosticStatus})`,
+      `Location: ${submittedCase.address}, ${submittedCase.wardName}`,
+      `Coordinates: ${submittedCase.lat}, ${submittedCase.lng}`,
+      `Reporter: ${submittedCase.reporterName} (${submittedCase.reporterType})`,
+      `Reported at: ${new Date(submittedCase.reportedAt).toLocaleString()}`,
+      `Photo reference: ${submittedCase.photoAssetId ?? 'None'}`,
+    ].join('\n');
+
+    window.open(`https://wa.me/${CONCERNED_OFFICER_WHATSAPP}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+    setSubmittedCase(null);
+  };
+
+  const handleDeletePhoto = (caseId: string) => {
+    if (!canPerformAction(currentRole, 'DELETE_PHOTO')) return;
+
+    const photo = photoAssets.find((asset) => asset.caseId === caseId);
+    if (!photo) return;
+
+    setPhotoAssets((previous) => previous.filter((asset) => asset.caseId !== caseId));
+    setCases((previous) => previous.map((item) => item.id === caseId
+      ? { ...item, photoProofBase64: undefined, photoAssetId: undefined, photoStoredAt: undefined }
+      : item));
+    setActiveToast(`Photo evidence for ${photo.patientName} was deleted.`);
+  };
+
+  if (isIntroVisible) {
+    return <IntroScreen onGetStarted={() => { setIsIntroVisible(false); setIsAuthModalOpen(true); }} />;
+  }
 
   const handleDispatchCluster = (cluster: GISCluster) => {
     const ward = wards.find(w => w.id === cluster.wardId);
@@ -303,6 +345,8 @@ export function App() {
               wards={wards}
               clusters={clusters}
               photoAssets={photoAssets}
+              canDeletePhotos={canPerformAction(currentRole, 'DELETE_PHOTO')}
+              onDeletePhoto={handleDeletePhoto}
             />
           )}
         </main>
@@ -337,6 +381,23 @@ export function App() {
         logs={smsLogs}
         onSendTestSms={handleSendTestSms}
       />
+
+      {submittedCase && (
+        <div className="whatsapp-prompt" role="dialog" aria-modal="true" aria-labelledby="whatsapp-prompt-title">
+          <div className="whatsapp-prompt-card">
+            <h2 id="whatsapp-prompt-title">Report submitted</h2>
+            <p>Send these details to the concerned officer on WhatsApp for faster action?</p>
+            <small>You will be able to review the message in WhatsApp before sending.</small>
+            <div className="whatsapp-prompt-actions">
+              <button type="button" className="btn-primary whatsapp-button" onClick={handleSendToWhatsApp}>
+                <MessageCircle size={16} aria-hidden="true" />
+                <span>Send via WhatsApp</span>
+              </button>
+              <button type="button" className="btn-primary" style={{ backgroundColor: '#1e293b' }} onClick={() => setSubmittedCase(null)}>No thanks</button>
+            </div>
+          </div>
+        </div>
+      )}
 
 
     </div>
